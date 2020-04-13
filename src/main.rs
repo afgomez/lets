@@ -1,7 +1,7 @@
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::prelude::*;
-use std::io::BufReader;
+use std::io::{BufReader, BufWriter, SeekFrom};
 use std::path::Path;
 
 const USAGE: &'static str = "
@@ -16,6 +16,8 @@ Usage:
 Configuration:
     To block hosts, edit `/etc/hosts.block` and add one host per line.
 ";
+
+const LOCALHOST_ADDR: &'static str = "127.0.0.1";
 const HOSTS_FILE_PATH: &'static str = "/etc/hosts";
 const HOST_LIST_FILE: &'static str = "/etc/hosts.block";
 
@@ -26,7 +28,7 @@ struct HostsFile {
 
 impl HostsFile {
     fn open(path: &Path) -> io::Result<Self> {
-        let f = File::open(&path)?;
+        let f = OpenOptions::new().write(true).read(true).open(&path)?;
         Ok(HostsFile {
             f,
             lines: Vec::new(),
@@ -39,6 +41,27 @@ impl HostsFile {
         // TODO be smarter when parsing lines
         for line in reader.lines() {
             self.lines.push(line.unwrap());
+        }
+
+        Ok(())
+    }
+
+    fn block(&mut self, host_list: &Vec<String>) -> io::Result<()> {
+        for host in host_list {
+            self.lines.push(format!("{}\t{}", LOCALHOST_ADDR, host));
+        }
+
+        self.flush()?;
+        Ok(())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        let mut writer = BufWriter::new(&mut self.f);
+        writer.seek(SeekFrom::Start(0))?;
+
+        for line in &self.lines {
+            writer.write(line.as_bytes())?;
+            writer.write(b"\n")?;
         }
 
         Ok(())
@@ -64,13 +87,16 @@ fn main() -> io::Result<()> {
     let arg = std::env::args().nth(1);
     let action = arg.unwrap_or(String::from(""));
 
-    let _hosts_to_block = load_hosts_list(Path::new(&HOST_LIST_FILE))?;
-    let mut _hosts_file = HostsFile::open(Path::new(&HOSTS_FILE_PATH))?;
-    _hosts_file.load()?;
+    let hosts_to_block = load_hosts_list(Path::new(&HOST_LIST_FILE))?;
+    let mut hosts_file = HostsFile::open(Path::new(&HOSTS_FILE_PATH))?;
+    hosts_file.load()?;
 
     match action.as_str() {
         "play" => println!("Let's play!"),
-        "work" => println!("Let's work!"),
+        "work" => {
+            hosts_file.block(&hosts_to_block)?;
+            println!("Let's work!");
+        }
         _ => eprintln!("{}", &USAGE),
     }
 
