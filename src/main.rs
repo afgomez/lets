@@ -16,8 +16,34 @@ Usage:
 Configuration:
     To block hosts, edit `/etc/hosts.block` and add one host per line.
 ";
-
+const HOSTS_FILE_PATH: &'static str = "/etc/hosts";
 const HOST_LIST_FILE: &'static str = "/etc/hosts.block";
+
+struct HostsFile {
+    f: File,
+    lines: Vec<String>,
+}
+
+impl HostsFile {
+    fn open(path: &Path) -> io::Result<Self> {
+        let f = File::open(&path)?;
+        Ok(HostsFile {
+            f,
+            lines: Vec::new(),
+        })
+    }
+
+    fn load(&mut self) -> io::Result<()> {
+        let reader = BufReader::new(&self.f);
+
+        // TODO be smarter when parsing lines
+        for line in reader.lines() {
+            self.lines.push(line.unwrap());
+        }
+
+        Ok(())
+    }
+}
 
 fn load_hosts_list(fpath: &Path) -> io::Result<Vec<String>> {
     let f = File::open(fpath)?;
@@ -39,6 +65,8 @@ fn main() -> io::Result<()> {
     let action = arg.unwrap_or(String::from(""));
 
     let _hosts_to_block = load_hosts_list(Path::new(&HOST_LIST_FILE))?;
+    let mut _hosts_file = HostsFile::open(Path::new(&HOSTS_FILE_PATH))?;
+    _hosts_file.load()?;
 
     match action.as_str() {
         "play" => println!("Let's play!"),
