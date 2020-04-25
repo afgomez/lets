@@ -88,7 +88,23 @@ impl HostsFile {
         Ok(())
     }
 
+    fn unblock(&mut self, host_list: &Vec<String>) -> io::Result<()> {
+        self.lines = self
+            .lines
+            .drain(..)
+            .filter(|line| match line {
+                HostLine::Literal(_) => true,
+                HostLine::Entry(entry) => !host_list.contains(&entry.name),
+            })
+            .collect::<Vec<HostLine>>();
+
+        self.flush()?;
+        Ok(())
+    }
+
     fn flush(&mut self) -> io::Result<()> {
+        self.f.set_len(0)?;
+
         let mut writer = BufWriter::new(&mut self.f);
         writer.seek(SeekFrom::Start(0))?;
 
@@ -126,7 +142,7 @@ fn main() -> io::Result<()> {
 
     match action.as_str() {
         "play" => {
-            // hosts_file.unblock(&hosts_to_block)?;
+            hosts_file.unblock(&hosts_to_block)?;
             println!("Let's play!")
         }
         "work" => {
