@@ -3,6 +3,13 @@ name = "lets"
 version = "0.1.0"
 authors = ["Alejandro Fernández Gómez <antarticonorte@gmail.com>"]
 edition = "2018"
+license = "MIT"
+description = "A simple productivity tool"
+categories = ["command-line-utilities"]
+homepage = "https://github.com/afgomez/lets"
+repository = "https://github.com/afgomez/lets"
+documentation = "https://github.com/afgomez/lets"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
