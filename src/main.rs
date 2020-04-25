@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::prelude::*;
@@ -21,9 +22,30 @@ const LOCALHOST_ADDR: &'static str = "127.0.0.1";
 const HOSTS_FILE_PATH: &'static str = "/etc/hosts";
 const HOST_LIST_FILE: &'static str = "/etc/hosts.block";
 
+#[derive(Debug)]
+struct HostEntry {
+    address: String,
+    name: String,
+}
+
+#[derive(Debug)]
+enum HostLine {
+    Literal(String),
+    Entry(HostEntry),
+}
+
+impl HostLine {
+    fn to_string(&self) -> String {
+        match &self {
+            HostLine::Literal(string) => string.clone(),
+            HostLine::Entry(host) => format!("{}\t{}", host.address, host.name),
+        }
+    }
+}
+
 struct HostsFile {
     f: File,
-    lines: Vec<String>,
+    lines: Vec<HostLine>,
 }
 
 impl HostsFile {
@@ -37,10 +59,18 @@ impl HostsFile {
 
     fn load(&mut self) -> io::Result<()> {
         let reader = BufReader::new(&self.f);
+        let re = Regex::new(r"^\s*(\d+\.\d+\.\d+\.\d+)\s*(.?*)\s*$").unwrap();
 
-        // TODO be smarter when parsing lines
-        for line in reader.lines() {
-            self.lines.push(line.unwrap());
+        for l in reader.lines() {
+            let line = l.unwrap();
+            let host_line = match re.captures(&line) {
+                None => HostLine::Literal(line),
+                Some(matched_line) => HostLine::Entry(HostEntry {
+                    address: String::from(matched_line.get(1).unwrap().as_str()),
+                    name: String::from(matched_line.get(2).unwrap().as_str()),
+                }),
+            };
+            self.lines.push(host_line);
         }
 
         Ok(())
@@ -48,7 +78,10 @@ impl HostsFile {
 
     fn block(&mut self, host_list: &Vec<String>) -> io::Result<()> {
         for host in host_list {
-            self.lines.push(format!("{}\t{}", LOCALHOST_ADDR, host));
+            self.lines.push(HostLine::Entry(HostEntry {
+                address: String::from(LOCALHOST_ADDR),
+                name: String::from(host),
+            }));
         }
 
         self.flush()?;
@@ -60,7 +93,7 @@ impl HostsFile {
         writer.seek(SeekFrom::Start(0))?;
 
         for line in &self.lines {
-            writer.write(line.as_bytes())?;
+            writer.write(line.to_string().as_bytes())?;
             writer.write(b"\n")?;
         }
 
@@ -92,7 +125,10 @@ fn main() -> io::Result<()> {
     hosts_file.load()?;
 
     match action.as_str() {
-        "play" => println!("Let's play!"),
+        "play" => {
+            // hosts_file.unblock(&hosts_to_block)?;
+            println!("Let's play!")
+        }
         "work" => {
             hosts_file.block(&hosts_to_block)?;
             println!("Let's work!");
