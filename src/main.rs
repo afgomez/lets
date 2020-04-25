@@ -122,11 +122,12 @@ fn load_hosts_list(fpath: &Path) -> io::Result<Vec<String>> {
     let reader = BufReader::new(f);
     let mut hosts: Vec<String> = Vec::new();
 
-    // TODO:
-    // - Allow comments
-    // - Ignore empty lines
-    for line in reader.lines() {
-        hosts.push(line.unwrap());
+    for l in reader.lines() {
+        let line = l.unwrap();
+        let line = line.trim();
+        if !line.starts_with("#") {
+            hosts.push(String::from(line));
+        }
     }
 
     Ok(hosts)
